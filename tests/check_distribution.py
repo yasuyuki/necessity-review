@@ -18,7 +18,7 @@ def main():
     python = Path(args.python).absolute()
     launcher = python.parent / ("necessity-review.exe" if os.name == "nt" else "necessity-review")
     assert launcher.is_file(), launcher
-    with tempfile.TemporaryDirectory(prefix="necessity-distribution-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="necessity-distribution-", dir=python.parent.parent) as temporary:
         root = Path(temporary).resolve()
         env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
         env.pop("PYTHONPATH", None)
@@ -70,6 +70,7 @@ def main():
             db.execute("CREATE TABLE candidates (session TEXT,id TEXT,status TEXT,result TEXT,resolution TEXT)")
             db.execute("INSERT INTO candidates VALUES (?,?,?,?,?)",
                        ("fixture", "candidate", "reviewed", '{"action":"unassessed"}', None))
+        db.close()
         run([launcher, "record", "--codex-home", home, "--candidate", "candidate",
              "--outcome", "deferred", "--evidence", "Artifact fixture remains unassessed."])
         candidate = json.loads(run([launcher, "status", "--codex-home", home]))["candidates"][0]
