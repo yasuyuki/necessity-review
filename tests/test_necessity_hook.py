@@ -313,14 +313,18 @@ class HookTests(unittest.TestCase):
         self.assert_not_recovery(installed, self.management_payload(command))
 
     @unittest.skipUnless(os.name == "nt", "Windows short-path aliases are unavailable")
-    def test_recovery_accepts_pinned_source_and_home_short_path_aliases(self):
+    def test_recovery_accepts_pinned_launcher_and_home_short_path_aliases(self):
         import ctypes
-        source = self.root / "public source with spaces"
+        source = self.root / "public source with spaces" / "necessity_review"
         home = self.root / "codex home with spaces"
         shutil.copytree(BIN, source)
+        launcher = self.root / "console with spaces" / "necessity-review.exe"
+        launcher.parent.mkdir()
+        launcher.write_text("# fixture console launcher", encoding="utf-8")
         settings = self.root / "necessity-settings.json"
         settings.write_text(json.dumps(self.cfg), encoding="utf-8")
-        self.assertEqual(installer.install(home, settings, source=source), 0)
+        with patch.object(installer.sys, "argv", [str(launcher)]):
+            self.assertEqual(installer.install(home, settings, source=source), 0)
 
         def short_path(path):
             buffer = ctypes.create_unicode_buffer(32768)
@@ -329,12 +333,12 @@ class HookTests(unittest.TestCase):
                 self.skipTest("Windows short-path aliases are disabled")
             return Path(buffer.value)
 
-        short_source, short_home = short_path(source), short_path(home)
-        if (os.path.normcase(str(short_source)) == os.path.normcase(str(source)) or
+        short_launcher, short_home = short_path(launcher), short_path(home)
+        if (os.path.normcase(str(short_launcher)) == os.path.normcase(str(launcher)) or
                 os.path.normcase(str(short_home)) == os.path.normcase(str(home))):
-            self.skipTest("fixture directories have no distinct Windows short-path aliases")
-        command = self.management_command(short_home, "status", source=short_source,
-                                          extra=("--codex-home", str(short_home)))
+            self.skipTest("fixture paths have no distinct Windows short-path aliases")
+        command = " ".join(shlex.quote(word) for word in
+                           (str(short_launcher), "status", "--codex-home", str(short_home)))
         self.assert_recovery_without_state(home / "necessity-review", self.management_payload(command))
 
     def test_reviewer_child_tool_prohibition_precedes_management_recovery(self):

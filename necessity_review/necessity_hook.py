@@ -311,7 +311,7 @@ def management_call(payload, cfg):
             resolved = words[0]
         else:
             return False
-        if not resolved or unsafe(resolved) or not same(resolved, launcher):
+        if not resolved or unsafe(resolved) or Path(resolved).resolve() != launcher.resolve():
             return False
 
         # A console launcher imports a package by name. Verify that its actual
