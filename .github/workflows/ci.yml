@@ -1,0 +1,27 @@
+name: CI
+on: [push, pull_request]
+permissions: {contents: read}
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ['3.10', '3.12']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install . build
+      - run: python -B -m unittest discover -s tests -v
+      - run: python -m build
+      - shell: bash
+        run: |
+          python -m venv "$RUNNER_TEMP/necessity-runtime"
+          runtime="$RUNNER_TEMP/necessity-runtime/bin"
+          if [ "$RUNNER_OS" = Windows ]; then runtime="$RUNNER_TEMP/necessity-runtime/Scripts"; fi
+          "$runtime/python" -m pip install dist/*.whl
+          cd "$RUNNER_TEMP"
+          "$runtime/python" "$GITHUB_WORKSPACE/tests/check_distribution.py" --python "$runtime/python"

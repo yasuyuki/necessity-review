@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "necessity-review"
+version = "0.1.0"
+description = "Opt-in bounded command necessity review for native Codex hooks"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = ["bashlex==0.18", "tomli; python_version < '3.11'"]
+classifiers = ["Programming Language :: Python :: 3", "Operating System :: Microsoft :: Windows", "Operating System :: POSIX :: Linux"]
+
+[project.urls]
+Source = "https://github.com/yasuyuki/necessity-review"
+Provenance = "https://github.com/yasuyuki/agent-rules/tree/40d16b03b2fb0eeea9273f718f6a26f85202ce19"
+
+[project.scripts]
+necessity-review = "necessity_review.necessity_install:main"
+
+[tool.setuptools]
+packages = ["necessity_review"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+necessity_review = ["necessity_parse.ps1"]
