@@ -10,7 +10,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from contextlib import redirect_stderr, redirect_stdout
+from contextlib import closing, redirect_stderr, redirect_stdout
 from unittest.mock import patch
 
 
@@ -80,10 +80,11 @@ class NecessityInstallTests(unittest.TestCase):
         self.assertEqual(installer.install(self.home, self.settings, source=self.source), 0)
         state = Path(settings["state_dir"])
         state.mkdir()
-        with sqlite3.connect(state / "necessity.sqlite3") as db:
+        with closing(sqlite3.connect(state / "necessity.sqlite3")) as db:
             db.execute("CREATE TABLE candidates (session TEXT, id TEXT, status TEXT, result TEXT, resolution TEXT)")
             db.execute("INSERT INTO candidates VALUES (?,?,?,?,?)", (
                 "session", "candidate", "reviewed", json.dumps({"reason": "431\u2013820"}, ensure_ascii=False), None))
+            db.commit()
         raw = io.BytesIO()
         stream = io.TextIOWrapper(raw, encoding="cp932", errors="strict")
         with redirect_stdout(stream):
