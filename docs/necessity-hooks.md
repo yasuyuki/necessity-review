@@ -2,7 +2,7 @@
 
 `necessity-review` optionally selects commands for a restricted Codex review through native hooks. It does not grant permissions or change tool input.
 
-Install the package in the Python environment that executes hooks, and keep that interpreter fixed. Prepare a private JSON settings file; `necessity_review.necessity_install._settings` is the exact schema authority. It requires absolute scopes, excludes, and state directory; explicit reviewer model and effort; and positive limits. The optional absolute `codex_executable` is needed when the normal runtime wrapper cannot provide the restricted reviewer invocation. Bash parsing uses the declared `bashlex` dependency, Python uses the standard-library AST, and PowerShell support requires an installed `pwsh`; unavailable parsing is unassessed.
+Install the package in the Python environment that executes hooks, and keep that interpreter fixed. Prepare a private JSON settings file; `necessity_review.necessity_install._settings` is the exact schema authority. It requires absolute scopes, excludes, and state directory; explicit reviewer model and effort; and positive limits. The optional absolute `codex_executable` is needed when the normal runtime wrapper cannot provide the restricted reviewer invocation. Windows production requires `"shell": "pwsh"` and PowerShell 7 or newer; install and check verify the executable and major version. Bash parsing uses the declared `bashlex` dependency, Python uses the standard-library AST, and PowerShell parsing uses `pwsh -NoProfile -NonInteractive -File necessity_parse.ps1`. Native hook and status JSON output uses ASCII escapes so Unicode values survive CP932 stdout and are restored by JSON parsing.
 
 Use the single console entry:
 

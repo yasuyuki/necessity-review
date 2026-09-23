@@ -52,7 +52,7 @@ def main():
             "state_dir": str(state), "model": "fixture-no-model", "effort": "low",
             "deadline_seconds": 4, "max_input_bytes": 65536, "max_output_bytes": 65536,
             "reviews_per_session": 2, "retention_seconds": 60, "max_sessions": 2,
-            "shell": "bash",
+            "shell": "pwsh" if os.name == "nt" else "bash",
         }), encoding="utf-8")
         other_bin = root / "other-bin"
         other_bin.mkdir()

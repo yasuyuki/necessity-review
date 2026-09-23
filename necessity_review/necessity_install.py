@@ -14,6 +14,7 @@ import json
 import os
 import re
 import shlex
+import shutil
 import sqlite3
 import stat
 import subprocess
@@ -167,6 +168,29 @@ def _settings(path):
     return document
 
 
+def _is_windows():
+    return os.name == "nt"
+
+
+def _require_windows_pwsh(settings):
+    if not _is_windows():
+        return
+    if settings.get("shell") != "pwsh":
+        raise InstallError('Windows necessity settings require shell: "pwsh"')
+    executable = shutil.which("pwsh")
+    if not executable:
+        raise InstallError("PowerShell 7 or newer (pwsh) is required on Windows")
+    try:
+        result = subprocess.run(
+            [executable, "-NoProfile", "-NonInteractive", "-Command", "$PSVersionTable.PSVersion.Major"],
+            capture_output=True, text=True, timeout=10, check=False)
+        major = int(result.stdout.strip()) if result.returncode == 0 else 0
+    except (OSError, ValueError, subprocess.TimeoutExpired) as exc:
+        raise InstallError("cannot verify PowerShell 7 or newer (pwsh)") from exc
+    if major < 7:
+        raise InstallError("PowerShell 7 or newer (pwsh) is required on Windows")
+
+
 def _command(config, *, event=None, windows=None):
     """Encode the fixed argv without resolving away an active virtualenv."""
     executable = str(Path(sys.executable))
@@ -307,6 +331,7 @@ def install(codex_home, settings_path, *, source=None):
     home = _absolute(codex_home, "codex_home")
     settings_path = _absolute(settings_path, "settings")
     settings = _settings(settings_path)
+    _require_windows_pwsh(settings)
     settings_bytes = (json.dumps(settings, sort_keys=True, indent=2) + "\n").encode()
     root = home / "necessity-review"
     if home.exists() and home.is_symlink() or root.is_symlink():
@@ -383,6 +408,7 @@ def check(codex_home, settings_path=None):
     root = home / "necessity-review"
     try:
         manifest = _manifest(root)
+        _require_windows_pwsh(_settings(root / CONFIG))
         hooks = _json(home / "hooks.json")
         command = manifest["command"]
         files_ok = all((root / name).is_file() and not (root / name).is_symlink() and _digest(root / name) == digest
@@ -581,10 +607,10 @@ def status(codex_home):
             document = {"omitted": document.get("omitted", 0) + len(document.get("candidates", [])),
                         "diagnostics_omitted": document.get("diagnostics_omitted", 0)
                         + len(document.get("diagnostics", []))}
-        print(json.dumps(document, ensure_ascii=False))
+        print(json.dumps(document, ensure_ascii=True))
         return 0
     except (InstallError, OSError) as exc:
-        print("FAIL: %s" % exc, file=sys.stderr)
+        print(("FAIL: %s" % exc).encode("ascii", "backslashreplace").decode("ascii"), file=sys.stderr)
         return 1
 
 
@@ -661,7 +687,7 @@ def main(argv=None):
             return record(args.codex_home, args.candidate, args.outcome, args.evidence)
         return remove(args.codex_home)
     except InstallError as exc:
-        print("FAIL: %s" % exc, file=sys.stderr)
+        print(("FAIL: %s" % exc).encode("ascii", "backslashreplace").decode("ascii"), file=sys.stderr)
         return 1
 
 
