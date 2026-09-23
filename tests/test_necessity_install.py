@@ -10,7 +10,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from contextlib import redirect_stderr, redirect_stdout
+from contextlib import closing, redirect_stderr, redirect_stdout
 from unittest.mock import patch
 
 
@@ -41,10 +41,57 @@ class NecessityInstallTests(unittest.TestCase):
             "state_dir": str(root / "state"), "model": "gpt-test", "effort": "low",
             "deadline_seconds": 5, "max_input_bytes": 20, "max_output_bytes": 20,
             "reviews_per_session": 1, "retention_seconds": 20, "max_sessions": 1,
+            "shell": "pwsh" if os.name == "nt" else "bash",
         }), encoding="utf-8")
 
     def tearDown(self):
         self.temporary.cleanup()
+
+    def test_windows_pwsh_requirement_precedes_install_mutation_and_check(self):
+        settings = json.loads(self.settings.read_text(encoding="utf-8"))
+        settings["shell"] = "powershell"
+        self.settings.write_text(json.dumps(settings), encoding="utf-8")
+        with patch.object(installer, "_is_windows", return_value=True):
+            with self.assertRaisesRegex(installer.InstallError, 'shell: "pwsh"'):
+                installer.install(self.home, self.settings, source=self.source)
+        self.assertFalse(self.home.exists())
+        settings["shell"] = "pwsh"
+        self.settings.write_text(json.dumps(settings), encoding="utf-8")
+        with patch.object(installer, "_is_windows", return_value=True), patch.object(installer.shutil, "which", return_value=None):
+            with self.assertRaisesRegex(installer.InstallError, "PowerShell 7"):
+                installer.install(self.home, self.settings, source=self.source)
+        self.assertFalse(self.home.exists())
+        completed = subprocess.CompletedProcess([], 0, "6\n", "")
+        with patch.object(installer, "_is_windows", return_value=True), patch.object(installer.shutil, "which", return_value="pwsh"), patch.object(installer.subprocess, "run", return_value=completed):
+            with self.assertRaisesRegex(installer.InstallError, "PowerShell 7"):
+                installer.install(self.home, self.settings, source=self.source)
+        self.assertFalse(self.home.exists())
+        completed.stdout = "7\n"
+        with patch.object(installer, "_is_windows", return_value=True), patch.object(installer.shutil, "which", return_value="pwsh"), patch.object(installer.subprocess, "run", return_value=completed):
+            self.assertEqual(installer.install(self.home, self.settings, source=self.source), 0)
+            self.assertEqual(installer.check(self.home, self.settings), 0)
+        with patch.object(installer, "_is_windows", return_value=True), patch.object(installer.shutil, "which", return_value=None):
+            self.assertEqual(installer.check(self.home), 1)
+
+    def test_status_json_survives_cp932_stdout(self):
+        settings = json.loads(self.settings.read_text(encoding="utf-8"))
+        settings["max_output_bytes"] = 4096
+        self.settings.write_text(json.dumps(settings), encoding="utf-8")
+        self.assertEqual(installer.install(self.home, self.settings, source=self.source), 0)
+        state = Path(settings["state_dir"])
+        state.mkdir()
+        with closing(sqlite3.connect(state / "necessity.sqlite3")) as db:
+            db.execute("CREATE TABLE candidates (session TEXT, id TEXT, status TEXT, result TEXT, resolution TEXT)")
+            db.execute("INSERT INTO candidates VALUES (?,?,?,?,?)", (
+                "session", "candidate", "reviewed", json.dumps({"reason": "431\u2013820"}, ensure_ascii=False), None))
+            db.commit()
+        raw = io.BytesIO()
+        stream = io.TextIOWrapper(raw, encoding="cp932", errors="strict")
+        with redirect_stdout(stream):
+            self.assertEqual(installer.status(self.home), 0)
+        stream.flush()
+        self.assertTrue(raw.getvalue().isascii())
+        self.assertEqual(json.loads(raw.getvalue())["candidates"][0]["result"]["reason"], "431\u2013820")
 
     def test_install_check_is_idempotent_and_remove_preserves_other_hook(self):
         self.home.mkdir()

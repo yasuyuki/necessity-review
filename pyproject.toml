@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "necessity-review"
-version = "0.1.0"
+version = "0.2.0"
 description = "Opt-in bounded command necessity review for native Codex hooks"
 readme = "README.md"
 requires-python = ">=3.10"

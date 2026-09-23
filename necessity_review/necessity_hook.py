@@ -621,7 +621,7 @@ def main(argv=None):
             raise IntakeError("event_mismatch")
         event = args.event or payload.get("hook_event_name")
         result = handle(payload, cfg)
-        print(json.dumps(result, ensure_ascii=False))
+        print(json.dumps(result, ensure_ascii=True))
         return 0
     except Exception as exc:
         # Do not echo raw inputs or database contents in diagnostics.
@@ -638,7 +638,7 @@ def main(argv=None):
         if isinstance(event, str) and event in {"Stop", "SubagentStop"}:
             print(json.dumps({"systemMessage": message + " Stop cannot recover state; work remains unassessed."}))
             return 0
-        print(message, file=sys.stderr)
+        print(message.encode("ascii", "backslashreplace").decode("ascii"), file=sys.stderr)
         return 2
 
 

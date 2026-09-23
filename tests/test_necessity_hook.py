@@ -93,6 +93,33 @@ class HookTests(unittest.TestCase):
             code = hook.main(argv)
         return code, json.loads(stdout.getvalue()) if stdout.getvalue() else None, stderr.getvalue()
 
+    def test_native_json_survives_cp932_stdout_and_keeps_unicode_reason(self):
+        config = self.root / "intake.json"
+        config.write_text(json.dumps(self.cfg), encoding="utf-8")
+        payload = {"hook_event_name": "PreToolUse", "cwd": str(self.root)}
+        result = hook.decision_output("PreToolUse", "candidate", {
+            "action": "continue", "disposition": "normal", "reason": "431\u2013820"})
+        raw = io.BytesIO()
+        output = io.TextIOWrapper(raw, encoding="cp932", errors="strict")
+        source = io.TextIOWrapper(io.BytesIO(json.dumps(payload).encode("ascii")))
+        with patch.object(hook, "handle", return_value=result), patch.object(sys, "stdin", source), patch.object(sys, "stdout", output):
+            self.assertEqual(hook.main(["--config", str(config), "--event", "PreToolUse"]), 0)
+        output.flush()
+        self.assertTrue(raw.getvalue().isascii())
+        self.assertEqual(json.loads(raw.getvalue()), result)
+
+    def test_unicode_diagnostic_does_not_crash_cp932_stderr(self):
+        config = self.root / "intake.json"
+        config.write_text(json.dumps(self.cfg), encoding="utf-8")
+        payload = {"hook_event_name": "UnknownEvent", "cwd": str(self.root)}
+        raw = io.BytesIO()
+        error = io.TextIOWrapper(raw, encoding="cp932", errors="strict")
+        source = io.TextIOWrapper(io.BytesIO(json.dumps(payload).encode("ascii")))
+        with patch.object(hook, "handle", side_effect=RuntimeError("failed")), patch.object(hook, "diagnostic", return_value="431\u2013820"), patch.object(sys, "stdin", source), patch.object(sys, "stderr", error):
+            self.assertEqual(hook.main(["--config", str(config)]), 2)
+        error.flush()
+        self.assertIn(b"431\\u2013820", raw.getvalue())
+
     def test_native_irrelevant_payload_sizes_do_not_open_state(self):
         for size in (8, 65537, 262144):
             for change in ({"cwd": str(self.root.parent)}, {"cwd": str(self.root / "excluded")},
@@ -175,7 +202,7 @@ class HookTests(unittest.TestCase):
         """Install the actual hook files, including the recovery manifest pin."""
         home = self.root / "codex-home"
         settings = self.root / "necessity-settings.json"
-        config = dict(self.cfg, shell=shell)
+        config = dict(self.cfg, shell="pwsh" if os.name == "nt" else shell)
         settings.write_text(json.dumps(config), encoding="utf-8")
         launcher = self.root / "necessity-review"
         launcher.write_text("# fixture console launcher\n", encoding="utf-8")
@@ -322,7 +349,7 @@ class HookTests(unittest.TestCase):
         launcher.parent.mkdir()
         launcher.write_text("# fixture console launcher", encoding="utf-8")
         settings = self.root / "necessity-settings.json"
-        settings.write_text(json.dumps(self.cfg), encoding="utf-8")
+        settings.write_text(json.dumps(dict(self.cfg, shell="pwsh")), encoding="utf-8")
         with patch.object(installer.sys, "argv", [str(launcher)]):
             self.assertEqual(installer.install(home, settings, source=source), 0)
 
