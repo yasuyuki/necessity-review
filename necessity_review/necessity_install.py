@@ -20,19 +20,13 @@ import stat
 import subprocess
 import sys
 import tempfile
+import tomllib
 from pathlib import Path
 
 try:  # The distributed wheel also supports Windows, where this lock is absent.
     import fcntl
 except ImportError:  # pragma: no cover - Windows fallback is intentionally local
     fcntl = None
-try:  # Python 3.11; the wheel declares tomli for 3.10.
-    import tomllib
-except ImportError:  # pragma: no cover - exercised by the 3.10 wheel
-    try:
-        import tomli as tomllib
-    except ImportError:
-        tomllib = None
 
 HERE = Path(__file__).resolve().parent
 FILES = ("necessity_hook.py", "necessity_review.py", "necessity_select.py",
@@ -278,8 +272,6 @@ def _valid_toml(path):
         return
     if path.is_symlink():
         raise InstallError("refusing symlink config.toml")
-    if tomllib is None:
-        raise InstallError("TOML parser unavailable; cannot safely inspect config.toml")
     try:
         tomllib.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
